@@ -22,11 +22,10 @@ export function createHuman(p){
  const hips=addBone('hips',root,0,.89,0),spine=addBone('spine',hips,0,.14,0),head=addBone('head',spine,0,.49,0);
  const female=p.gender==='female',elder=lifeStage(p)==='Elder',skin=p.skin,hair=elder?'#b8b4ae':p.hair||'#49362d',shirt=p.color;
  const width=female?.19:.23;const shapes={oval:[1,1,1],heart:[.96,1.02,.94],round:[1.09,.93,1],angular:[1.04,1.03,1.05],soft:[.97,.96,.98],long:[.94,1.1,.97]};head.scale.fromArray(shapes[p.face]||shapes.oval);
- ell(hips,0,0,0,width*.9,.18,.14,'#344c64','fabric');ell(spine,0,.16,0,width,.29,.145,shirt,'fabric');
+ ell(hips,0,0,0,width*.9,.18,.14,p.outfit==='dress'?shirt:'#344c64','fabric');ell(spine,0,.16,0,width,.29,.145,shirt,'fabric');
  ell(spine,0,.38,0,.075,.105,.075,skin);rb(spine,0,.35,.1,.17,.05,.035,'#edebe4','fabric');
- if(female){ell(spine,-.09,.19,.095,.075,.09,.07,shirt,'fabric');ell(spine,.09,.19,.095,.075,.09,.07,shirt,'fabric');}
  for(let y=.03;y<.34;y+=.075)ell(spine,0,y,.146,.009,.009,.006,'#e6d0b1','metal');
- ell(head,0,.12,0,.126,.18,.115,skin);ell(head,0,.02,.022,female?.09:.098,.09,.097,skin); // cheek and jaw silhouette
+ ell(head,0,.12,0,.126,.18,.115,skin); // cheek and jaw silhouette
  for(const side of[-1,1]){ell(head,side*.128,.12,0,.024,.044,.023,skin);ell(head,side*.044,.146,.099,.029,.018,.019,'#fff9f0');ell(head,side*.044,.145,.116,.012,.013,.005,p.eyes||'#4b706b');ell(head,side*.044,.145,.12,.005,.008,.003,'#1f2625');ell(head,side*.047,.151,.122,.003,.003,.002,'#ffffff');
  tube(head,[[side*.068,.18,.097],[side*.047,.186,.115],[side*.023,.178,.109]],.006,hair);}
  ell(head,0,.115,.117,.019,.029,.025,skin);ell(head,0,.095,.14,.022,.014,.015,skin);tube(head,[[-.032,.06,.102],[-.01,.064,.115],[0,.06,.118],[.012,.064,.115],[.032,.06,.102]],female?.0065:.005,'#ad746a');tube(head,[[-.027,.055,.103],[0,.048,.115],[.027,.055,.103]],.005,'#b98072');
@@ -34,14 +33,14 @@ export function createHuman(p){
  for(const side of[-1,1])tube(head,[[side*.072,.15,.099],[side*.048,.162,.118],[side*.019,.15,.105]],.004,hair);
  if(p.glasses){for(const side of[-1,1]){const ring=new T.Mesh(new T.TorusGeometry(.034,.003,5,16),surface('#484442','metal'));ring.position.set(side*.046,.145,.127);head.add(ring);}rod(head,new T.Vector3(-.012,.15,.129),new T.Vector3(.012,.15,.129),.003,'#484442');}
  if(p.beard&&!female&&p.ageYears>=18){ell(head,0,-.014,.075,.08,.049,.05,hair);for(const side of[-1,1])ell(head,side*.08,.035,.05,.025,.06,.029,hair);}
- if(p.outfit==='dress'){const skirt=new T.Mesh(new T.ConeGeometry(.34,.49,24,1,true),surface(shirt,'fabric'));skirt.position.y=-.21;hips.add(skirt);}
+ if(p.outfit==='dress'){const skirt=new T.Mesh(new T.CylinderGeometry(.17,.31,.49,24,1,true),surface(shirt,'fabric'));skirt.position.y=-.21;hips.add(skirt);}
  if(p.hairStyle==='long'||p.hairStyle==='bob'){const length=p.hairStyle==='long'?.25:.13;for(const side of[-1,1]){ell(head,side*.112,.13-length*.35,-.015,.035,length,.087,hair);for(let i=0;i<3;i++)tube(head,[[side*(.105+i*.009),.22,-.01],[side*(.14+i*.002),.05,-.035],[side*.12,.13-length,-.02]],.01,hair);} }
  else if(p.hairStyle==='ponytail'){ell(head,0,.19,-.16,.075,.095,.095,hair);ell(head,0,.025,-.19,.065,.22,.073,hair);}
  else if(p.hairStyle==='bun'){ell(head,0,.30,-.10,.08,.09,.08,hair);}
  else if(p.hairStyle==='curly'){for(let i=0;i<24;i++){const a=i*2.4,y=.17+(i%4)*.036;ell(head,Math.cos(a)*.112,y,Math.sin(a)*.1-.015,.04,.045,.04,hair);}}
  else{for(let i=0;i<7;i++){const tuft=ell(head,-.105+i*.035,.265+(p.hairStyle==='sidepart'?i*.006:0),.03,.036,p.hairStyle==='pixie'?.032:.048,.073,hair);tuft.rotation.z=p.hairStyle==='sidepart'?-.65:-.3;}}
  for(const [label,side]of[['L',-1],['R',1]]){
-  const arm=addBone('arm'+label,spine,side*(width+.035),.31,0);ell(arm,0,-.105,0,.075,.14,.073,shirt,'fabric');
+  const arm=addBone('arm'+label,spine,side*(width+.035),.31,0);ell(arm,0,-.105,0,.059,.145,.06,shirt,'fabric');
   const fore=addBone('fore'+label,arm,0,-.235,0);ell(fore,0,-.10,0,.047,.14,.05,skin);
   const hand=addBone('hand'+label,fore,0,-.21,0);ell(hand,0,-.032,.007,.04,.059,.024,skin);
   for(let f=0;f<4;f++)ell(hand,(f-1.5)*.017,-.098,0,.009,.032,.01,skin);ell(hand,side*.04,-.033,.015,.016,.039,.016,skin);
@@ -97,7 +96,7 @@ export function animateHuman(g,p,s,time){
  parts.spine.scale.y=1;parts.hips.position.y=.89;parts.spine.rotation.x=lifeStage(p)==='Elder'?.1:0;
  if(p.path.length){const t=time*6;for(const [side,sign]of[['L',1],['R',-1]]){parts['thigh'+side].rotation.x=Math.sin(t)*.5*sign;parts['shin'+side].rotation.x=Math.max(0,Math.sin(t+.7)*sign)*.55;parts['arm'+side].rotation.x=-Math.sin(t)*.38*sign;parts['fore'+side].rotation.x=-.18;}g.position.y=Math.abs(Math.sin(t))*.025;}
  else{parts.spine.scale.y=1+Math.sin(time*1.8)*.008;parts.head.rotation.y=Math.sin(time*.6+p.id%7)*.07;}
- if(o&&!p.path.length)g.rotation.y=Math.atan2(o.x-p.x,o.z-p.z);
+ if(o&&!p.path.length){g.rotation.y=Math.atan2(o.x-p.x,o.z-p.z);if(['retrieve','prepare','cook','loadDishwasher','washDish','washHands','clean','makeBed','runWasher','read','study'].includes(action)){const a=.22*Math.min(1,progress*10);g.position.x+=(o.x-p.x)*a;g.position.z+=(o.z-p.z)*a;}}
  if(action==='sit')poseSeat(ease(progress));if(action==='stand')poseSeat(1-ease(progress));if(['eat','watchTV','toilet','sitDown','sofaNap'].includes(action)&& (st.seated||['toilet','sitDown','sofaNap'].includes(action)))poseSeat();if(action==='sofaNap'){parts.spine.rotation.z=.25;parts.head.rotation.z=.18;}
  if(['retrieve','prepare','cook','loadDishwasher','washDish','washHands','clearPlate','clean','makeBed','water','outfit','hair','runWasher','computer','workHome'].includes(action)){
   parts.armL.rotation.x=-.7;parts.armR.rotation.x=-.9;parts.foreL.rotation.x=-.9;parts.foreR.rotation.x=-.8+Math.sin(time*5)*.27;parts.armR.rotation.z=Math.sin(time*3)*.15;
