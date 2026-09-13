@@ -27,7 +27,7 @@ function psel(){return state.people.find(p=>p.id===selected)||state.people[0];}
 const effects=new LivingEffects(world);
 function clear(g){for(const child of [...g.children]){child.traverse(m=>{if(m.isMesh&&m.geometry!==boxGeo&&m.geometry!==cylGeo&&m.geometry!==ballGeo)m.geometry.dispose();});g.remove(child);}}
 function rebuild(){staticWorld.clear();effects.rebuild(state);
- for(const [k,type]of Object.entries(state.floors)){const [x,z]=k.split(',').map(Number);const floor=box(staticWorld,x,.006,z,.985,.032,.985,item(type)?.color||'#d2bb93');floor.userData.floor={x,z};floor.material=surface(item(type)?.color||'#d2bb93',type==='floor'?'wood':'ceramic');if(type==='floor')box(staticWorld,x,.023,z,.012,.003,.98,'#b38154');}
+ for(const [k,type]of Object.entries(state.floors)){const [x,z]=k.split(',').map(Number);const floor=box(staticWorld,x,.006,z,.985,.032,.985,item(type)?.color||'#d2bb93');floor.userData.floor={x,z};floor.material=surface(type==='floor'?'#c5a581':item(type)?.color||'#d2bb93',type==='floor'?'wood':'ceramic');if(type==='floor')box(staticWorld,x,.023,z,.012,.003,.98,'#b38154');}
  for(const [k,type]of Object.entries(state.walls)){const[x,z,o]=k.split(',').map(Number);let h=wallMode===0?.06:wallMode===1?.58:2.4;const g=new T.Group();g.position.set(x-(o===0?.5:0),0,z-(o===1?.5:0));g.rotation.y=o===0?Math.PI/2:0;g.userData.wall=k;let c=type==='brick'?'#bd7358':'#ecddbb';
  if(type==='door'){box(g,-.45,h/2,0,.1,h,.15,'#986e4c');box(g,.45,h/2,0,.1,h,.15,'#986e4c');if(h>2)box(g,0,2.15,0,1,.5,.15,c);}
  else if(type==='window'&&h>1){box(g,0,.42,0,1,.84,.15,c);box(g,0,2.18,0,1,.44,.15,c);box(g,-.44,1.4,0,.12,1.15,.16,c);box(g,.44,1.4,0,.12,1.15,.16,c);box(g,0,1.4,0,.025,1.15,.08,'#769b9a');box(g,0,1.4,0,.88,.025,.08,'#769b9a');}
@@ -35,7 +35,7 @@ function rebuild(){staticWorld.clear();effects.rebuild(state);
  for(const o of state.objects){const g=makeFurniture(o,item(o.type).color);if(g.userData.door)effects.attachDoor(o,g.userData.door);staticWorld.add(g);}
  for(const [id,g]of personMeshes){peopleWorld.remove(g);g.traverse(m=>{if(m.isSkinnedMesh){m.geometry.dispose();m.skeleton.dispose();}});}personMeshes.clear();
  for(const p of state.people){const g=createHuman(p);peopleWorld.add(g);personMeshes.set(p.id,g);}
- staticWorld.updateMatrixWorld(true);clear(staticMerged);
+ effects.avatars=personMeshes;staticWorld.updateMatrixWorld(true);clear(staticMerged);
  const grouped=new Map();staticWorld.traverse(m=>{if(m.isMesh){const geo=m.geometry.clone();// Merge in lot-local space; the VR tabletop transform remains on world.
  const matrix=new T.Matrix4();let node=m;matrix.identity();const chain=[];while(node!==staticWorld){chain.unshift(node);node=node.parent;}matrix.identity();for(const part of chain)matrix.multiply(part.matrix);
  geo.copy(m.geometry).applyMatrix4(matrix);if(!geo.index){const count=geo.attributes.position.count;geo.setIndex(Array.from({length:count},(_,i)=>i));}
