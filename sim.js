@@ -31,10 +31,11 @@ export const TRAITS=['Creative','Sociable','Active','Bookworm'];
 export function lifeStage(p){return p.ageYears<4?'Toddler':p.ageYears<13?'Child':p.ageYears<18?'Teen':p.ageYears<65?'Adult':'Elder';}
 export function person(name,x,z,color='#4b9f96',identity={}){return {id:Date.now()+serial++,name,x,z,color,skin:identity.skin||'#c99b77',gender:identity.gender||'male',ageYears:identity.ageYears??27,hair:identity.hair||'#49362d',hairStyle:identity.hairStyle||'short',eyes:identity.eyes||'#4b706b',trait:identity.trait||TRAITS[serial%4],generation:identity.generation||1,parents:identity.parents||[],face:identity.face||'oval',outfit:identity.outfit||'casual',glasses:!!identity.glasses,beard:!!identity.beard,needs:Object.fromEntries(NEEDS.map(n=>[n,75+Math.random()*20])),queue:[],path:[],activity:'Idle',task:null,remaining:0,job:0};}
 export function upgradeState(s){
+ const migrateInteractions=s.interactionVersion!==1;s.interactionVersion=1;
  s.familyHistory??=[];s.aging??=true;s.car??={phase:'idle',x:-16,timer:0,passenger:null};
  for(const [i,p]of s.people.entries()){
   p.face??='oval';p.outfit??='casual';p.glasses??=false;p.beard??=false;p.skin??='#c99b77';if(p.job>0&&s.car.passenger!==p.id){p.job=0;p.activity='Home from work';}p.gender??=['Maya','Nora','Lina','Jade'].includes(p.name)?'female':'male';p.ageYears??=p.name==='Lina'?9:27+i*3;p.hairStyle??=p.gender==='female'?'long':'short';p.hair??='#49362d';p.eyes??='#4b706b';p.trait??=TRAITS[i%4];p.generation??=1;p.parents??=[];
-  if(p.task&&!p.task.stages){p.task=null;p.path=[];p.queue=[];p.remaining=0;}
+  if(migrateInteractions||p.task&&!p.task.stages){p.heldBy=null;p.task=null;p.path=[];p.queue=[];p.remaining=0;}
  }
  s.livingVersion=2;return s;
 }
