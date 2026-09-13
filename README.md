@@ -17,6 +17,9 @@ If the initial deployment failed before Pages was enabled, open **Actions → Te
 ## Implemented
 
 - Two furnished households and an empty building plot, saved separately.
+- 16 appearance presets, six face shapes, eight hairstyles, eye colors, glasses, beards and outfits, with a live character preview.
+- Context action menus above people and furnishings in desktop and VR; meals, naps, cleaning, channels, gardening, studying and work from home.
+- Friendship, jokes, compliments, hugs, adult romance, engagement, marriage, private bed time with a fade-out, and a child arriving two game days later. Related residents and children have no romantic interactions.
 - Up to six jointed, animated residents with face details, hair, skin and clothing colors, gender, age and personality. Desktop appearance editor and VR family presets.
 - Full meal routines: choose ingredients, prepare, cook with steam, sit and eat a visibly shrinking meal, then load a dishwasher or wash the plate.
 - Bed entry/sleep/exit, swimming in animated water, seated TV viewing with an animated nature channel, showering, reading and social gestures.
@@ -38,20 +41,20 @@ If the initial deployment failed before Pages was enabled, open **Actions → Te
 
 | Input | Action |
 |---|---|
-| Click / controller trigger | Select person, use furniture, walk, or place catalog item |
+| Click / controller trigger | Open person/furniture action menus, walk, or place catalog items |
 | Shift-click (desktop) | Queue an action |
 | Drag (desktop) | Orbit tabletop or look around in walk view |
 | Wheel / + / − | Desktop zoom |
 | WASD / arrow keys | Move in desktop walk view |
 | R | Rotate placement (walls alternate between two grid edges) |
 | Space | Pause / resume |
-| Left thumbstick | Move through the scene |
+| Left thumbstick | Move relative to current headset direction |
 | Right thumbstick left/right | Smooth turn |
 | Right thumbstick up/down | Scale tabletop |
 | Either grip | Bring VR menu in front of you |
 | VR menu → Teleport | In walk view, point and trigger on a free square |
 
-Building pauses simulation. There is no grab-to-move tool; sell/erase and replace furnishings. Routines reserve their appliances and seats. If a dining chair or dishwasher is missing, meals fall back to available surfaces and sinks. Work is simulated off-lot after the visible carpool departure. Beds occupy two cells and pools four; rotate before placing. Existing saves migrate automatically; purchase the new pool and dishwasher for an older lot.
+Building pauses simulation. Click placed furniture for Move or Rotate. Rotation works on existing objects; a green front arrow appears in Build mode. Appliances and storage require clear front access, beds require side access, and residents cannot interact through walls. Routines reserve their appliances and seats. If a dining chair or dishwasher is missing, meals fall back to available surfaces and sinks. Work is simulated off-lot after the visible carpool departure. Beds occupy two cells and pools four; rotate before placing. Existing saves migrate automatically; purchase the new pool and dishwasher for an older lot.
 
 ## Run locally
 
@@ -66,6 +69,8 @@ Open http://localhost:8080. A remote Quest needs HTTPS, such as GitHub Pages.
 
 ## Scope and testing limitations
 
-This release has single-story lots and detailed stylized characters and furnishings, not photoreal humans or motion-captured animation. It does not implement the full original game's catalog, expansions, complex careers/relationships, terrain editing, custom texture import, or original soundtrack. Children currently share the basic household routines; growth is accelerated and new descendants are added with the Welcome a child action. Unit checks cover routines, skinning, navigation, aging, carpool payment and VR targeting. CI additionally exercises real WebGL rendering, visible food, all main routines, household editing and synthetic two-controller VR interaction. Quest hardware frame rate and comfort require on-device testing; desktop/software rendering tests cannot establish those results.
+Character models are original and remain stylized. Quaternius Universal Base Characters was evaluated (https://quaternius.com/packs/universalbasecharacters.html), but no external character pack is bundled.
+
+This release has single-story lots and detailed stylized characters and furnishings, not photoreal humans or motion-captured animation. It does not implement the full original game's catalog, expansions, complex careers/relationships, terrain editing, custom texture import, or original soundtrack. Children currently share the basic household routines; growth is accelerated and new descendants arrive through Try for a baby after relationship progression, or the sandbox Welcome a child action. Unit checks cover routines, skinning, navigation, aging, carpool payment and VR targeting. CI additionally exercises real WebGL rendering, visible food, all main routines, household editing and synthetic two-controller VR interaction. Quest hardware frame rate and comfort require on-device testing; desktop/software rendering tests cannot establish those results.
 
 Third-party engine license: `vendor/THREE-LICENSE.txt`. Engine documentation: https://threejs.org/docs/ . Pages workflow documentation: https://github.com/actions/configure-pages .

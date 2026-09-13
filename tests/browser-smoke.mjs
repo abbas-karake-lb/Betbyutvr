@@ -9,13 +9,14 @@ try{
  let snap=await page.evaluate(()=>window.gameDebug.snapshot());assert.ok(snap.render.calls>0&&snap.render.calls<350,'draw calls: '+snap.render.calls);
  await fs.mkdir('test-results',{recursive:true});await page.screenshot({path:'test-results/household.png'});
  await livingChecks(page);
+ await menuChecks(page);
  await page.locator('#lot').selectOption('2');await page.locator('#build').click();
  let before=await page.evaluate(()=>window.gameDebug.snapshot());const point=await page.evaluate(()=>window.gameDebug.project(2,.02,0));await page.mouse.click(point.x,point.y);
  let after=await page.evaluate(()=>window.gameDebug.snapshot());assert.equal(Object.keys(after.state.floors).length,Object.keys(before.state.floors).length+1);assert.equal(after.state.money,before.state.money-8);
  await page.locator('#undo').click();after=await page.evaluate(()=>window.gameDebug.snapshot());assert.equal(after.state.money,before.state.money);assert.equal(Object.keys(after.state.floors).length,Object.keys(before.state.floors).length);
  await page.getByRole('button',{name:'Kitchen',exact:true}).click();await page.getByRole('button',{name:'Fridge $320',exact:true}).click();await page.mouse.click(point.x,point.y);
  after=await page.evaluate(()=>window.gameDebug.snapshot());assert.equal(after.state.objects.length,1);assert.equal(after.state.money,before.state.money-320);
- await page.locator('#live').click();const fridge=await page.evaluate(()=>window.gameDebug.project(2,.8,0));await page.mouse.click(fridge.x,fridge.y);assert.match(await page.locator('#notice').textContent(),/On my way/);
+ await page.locator('#live').click();const fridge=await page.evaluate(()=>window.gameDebug.project(2,.8,0));await page.mouse.click(fridge.x,fridge.y);await page.locator('#actionMenu [data-action="meal:pasta"]').click();assert.match(await page.locator('#notice').textContent(),/On my way/);
  await page.locator('#familyNew').click();await page.locator('#newName').fill('Test Resident');await page.locator('#addPerson').click();assert.equal(await page.locator('#personName').textContent(),'Test Resident');
  await page.locator('#save').click();await page.reload();await page.waitForFunction(()=>!!window.gameDebug);await page.locator('#lot').selectOption('2');assert.ok((await page.locator('#family').textContent()).includes('Test Resident'));
  await page.locator('#view').click();assert.equal((await page.evaluate(()=>window.gameDebug.snapshot())).walk,true);await page.locator('#view').click();assert.equal((await page.evaluate(()=>window.gameDebug.snapshot())).walk,false);
@@ -47,6 +48,7 @@ try{
  await page.screenshot({path:'test-results/vr-pointer-hover.png'});
  const selection=await page.evaluate(()=>{const f=window.vrPointerFixture;f.right.dispatchEvent({type:'selectstart'});return window.gameDebug.snapshot().mode;});assert.equal(selection,'build');
  const cleared=await page.evaluate(()=>{const f=window.vrPointerFixture;for(const c of f.game.controllers)c.dispatchEvent({type:'disconnected'});f.game.updateControllerPointers();const result={cursors:f.game.controllers.map(c=>c.userData.pointer.cursor.visible),color:f.pixel(55,335)};f.game.panel.visible=false;document.body.classList.remove('xr');return result;});assert.deepEqual(cleared.cursors,[false,false]);assert.deepEqual(cleared.color,[49,89,97]);
+ await vrMenuAndMovementChecks(page);
  assert.deepEqual(errors,[]);await fs.writeFile('test-results/report.json',JSON.stringify({passed:true,checks:['WebGL initialization','full cooking and seated meal routine','visible meal depletion','dishwasher cleanup','sleep and swim poses','animated TV routine','child generation and aging toggle','draw call budget','floor placement and cost','undo','furniture purchase','furniture interaction raycast','family creation','save and reload','view toggle','wall mode','audio toggle','non-XR fallback','mobile viewport','VR cursor visibility','two-controller button hover','VR trigger matches hover','VR disconnect cleanup'],initialDrawCalls:snap.render.calls,errors},null,2));console.log('Browser smoke checks passed; draw calls:',snap.render.calls);
 }finally{await browser.close();}
 
@@ -61,4 +63,20 @@ async function livingChecks(page){
  await page.locator('#child').click();assert.match(await page.locator('#identity').textContent(),/Toddler.*Generation 2/);
  await page.locator('#aging').uncheck();assert.equal((await page.evaluate(()=>window.gameDebug.snapshot())).state.aging,false);
  await page.locator('[data-speed="1"]').click();
+}
+
+async function menuChecks(page){
+ await page.locator('[data-speed="0"]').click();await page.locator('#family .person').first().click();
+ await page.evaluate(async()=>{const g=await import('/game.js'),s=await import('/sim.js');for(const p of g.state.people)s.cancelAction(p);g.showPersonMenu(g.state.people[1].id);});
+ assert.equal(await page.locator('#actionMenu [data-action="kiss"]').getAttribute('aria-disabled'),'true');
+ await page.screenshot({path:'test-results/person-action-menu.png'});await page.locator('#actionMenu [data-action="talk"]').click();
+ const friendship=await page.evaluate(async()=>{const g=await import('/game.js'),s=await import('/sim.js'),p=g.state.people[0];for(let i=0;i<1000&&p.task;i++)s.tick(g.state,.5,false);return s.relationship(g.state,p,g.state.people[1]).friendship;});assert.equal(friendship,8);
+ await page.evaluate(async()=>{const g=await import('/game.js');g.showObjectMenu(g.state.objects.find(o=>o.type==='bed'));});assert.ok(await page.locator('#actionMenu [data-action="makeBed"]').isVisible());await page.locator('#actionMenu [data-action="close"]').click();
+ const old=await page.evaluate(async()=>{const g=await import('/game.js'),o=g.state.objects.find(o=>o.type==='fridge');g.showObjectMenu(o);return o.rot;});await page.locator('#actionMenu [data-action="rotate"]').click();assert.equal(await page.evaluate(()=>window.gameDebug.snapshot().state.objects.find(o=>o.type==='fridge').rot),(old+1)%4);await page.locator('#actionMenu [data-action="rotate"]').click();await page.locator('#actionMenu [data-action="rotate"]').click();await page.locator('#actionMenu [data-action="rotate"]').click();await page.locator('#actionMenu [data-action="close"]').click();
+ await page.locator('#familyNew').click();await page.locator('#newPreset').selectOption('2');assert.equal(await page.locator('#newName').inputValue(),'Yara');assert.ok(await page.locator('#characterPreview canvas').isVisible());await page.screenshot({path:'test-results/character-editor.png'});await page.locator('#personDialog button[value="cancel"]').click();await page.locator('[data-speed="1"]').click();
+}
+async function vrMenuAndMovementChecks(page){
+ const result=await page.evaluate(async()=>{const g=await import('/game.js'),T=await import('/vendor/three.module.js');g.panel.visible=false;g.showObjectMenu(g.state.objects.find(o=>o.type==='fridge'));g.actionMenu.update(g.camera,true);const menu=g.actionMenu.mesh,c=g.controllers[0];c.visible=true;c.userData.source={handedness:'right',gamepad:{axes:[0,0,0,0]}};const center=menu.getWorldPosition(new T.Vector3()),normal=new T.Vector3(0,0,1).applyQuaternion(menu.quaternion);c.position.copy(center).addScaledVector(normal,.8);const b=g.actionMenu.buttons[0],point=menu.localToWorld(new T.Vector3(((b.x+b.w/2)/900-.5)*.78,(.5-(b.y+b.h/2)/1100)*.95,0));c.quaternion.setFromRotationMatrix(new T.Matrix4().lookAt(c.position,point,new T.Vector3(0,1,0)));g.updateControllerPointers();const hovered=g.actionMenu.hovered.has(0),cursor=c.userData.pointer.cursor.visible;c.dispatchEvent({type:'selectstart'});const closed=!g.actionMenu.open;
+ const left=g.controllers[1];left.visible=true;left.userData.source={handedness:'left',gamepad:{axes:[0,0,0,-1]}};const saved=g.renderer.xr.getReferenceSpace;g.renderer.xr.getReferenceSpace=()=>({});const savedPos=g.rig.position.clone(),savedRot=g.rig.quaternion.clone();g.rig.position.set(0,0,0);g.rig.rotation.set(0,0,0);const q=new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),Math.PI/2),frame={getViewerPose:()=>({transform:{position:{x:0,y:1.6,z:0},orientation:q}})};g.xrInput(.1,frame);const forward=g.rig.position.clone();g.rig.rotation.y=Math.PI/2;g.xrInput(.1,frame);const turned=g.rig.position.clone().sub(forward);g.rig.position.copy(savedPos);g.rig.quaternion.copy(savedRot);g.renderer.xr.getReferenceSpace=saved;for(const c of g.controllers)c.dispatchEvent({type:'disconnected'});return {hovered,cursor,closed,forward:forward.toArray(),turned:turned.toArray()};});
+ assert.ok(result.hovered&&result.cursor&&result.closed);assert.ok(result.forward[0]<0&&Math.abs(result.forward[2])<.0001);assert.ok(result.turned[2]>0&&Math.abs(result.turned[0])<.0001);
 }

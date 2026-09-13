@@ -3,3 +3,7 @@
 #game{position:fixed;inset:0;overflow:hidden}#game canvas{width:100%!important;height:100%!important}
 
 dialog{max-height:85vh;overflow:auto}#identity,#lineage{margin:7px 0;font-size:11px;line-height:1.5}#child{margin-top:6px}.check{line-height:1.5}
+
+#actionMenu{position:fixed;z-index:30;background:#f7faef;border:2px solid #315961;border-radius:14px;padding:14px;box-shadow:0 10px 40px #102c3855;max-height:70vh;overflow:auto}#actionMenu>b{display:block;font-size:17px}#actionMenu>small{display:block;color:#638077;margin:5px 0 12px}.action-options{display:grid;grid-template-columns:1fr 1fr;gap:6px}.action-options button{font-size:12px;text-align:left;padding:9px}.action-options small{display:block;font-size:10px;opacity:.7}.action-options [aria-disabled="true"]{opacity:.55}
+
+#characterPreview{position:sticky;top:-28px;background:#e4e8de;border-radius:10px;margin-bottom:15px;display:flex;justify-content:center;z-index:1}dialog .check input{width:auto;margin-right:8px}dialog input[type=color]{height:38px}
