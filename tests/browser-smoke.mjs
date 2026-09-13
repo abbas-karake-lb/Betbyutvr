@@ -6,8 +6,9 @@ try{
  await page.goto('http://127.0.0.1:8080');await page.waitForFunction(()=>!!window.gameDebug);
  await page.waitForTimeout(500);
  assert.equal(await page.locator('#personName').textContent(),'Maya');
- let snap=await page.evaluate(()=>window.gameDebug.snapshot());assert.ok(snap.render.calls>0&&snap.render.calls<150,'draw calls: '+snap.render.calls);
+ let snap=await page.evaluate(()=>window.gameDebug.snapshot());assert.ok(snap.render.calls>0&&snap.render.calls<350,'draw calls: '+snap.render.calls);
  await fs.mkdir('test-results',{recursive:true});await page.screenshot({path:'test-results/household.png'});
+ await livingChecks(page);
  await page.locator('#lot').selectOption('2');await page.locator('#build').click();
  let before=await page.evaluate(()=>window.gameDebug.snapshot());const point=await page.evaluate(()=>window.gameDebug.project(2,.02,0));await page.mouse.click(point.x,point.y);
  let after=await page.evaluate(()=>window.gameDebug.snapshot());assert.equal(Object.keys(after.state.floors).length,Object.keys(before.state.floors).length+1);assert.equal(after.state.money,before.state.money-8);
@@ -48,3 +49,16 @@ try{
  const cleared=await page.evaluate(()=>{const f=window.vrPointerFixture;for(const c of f.game.controllers)c.dispatchEvent({type:'disconnected'});f.game.updateControllerPointers();const result={cursors:f.game.controllers.map(c=>c.userData.pointer.cursor.visible),color:f.pixel(55,335)};f.game.panel.visible=false;document.body.classList.remove('xr');return result;});assert.deepEqual(cleared.cursors,[false,false]);assert.deepEqual(cleared.color,[49,89,97]);
  assert.deepEqual(errors,[]);await fs.writeFile('test-results/report.json',JSON.stringify({passed:true,checks:['WebGL initialization','draw call budget','floor placement and cost','undo','furniture purchase','furniture interaction raycast','family creation','save and reload','view toggle','wall mode','audio toggle','non-XR fallback','mobile viewport','VR cursor visibility','two-controller button hover','VR trigger matches hover','VR disconnect cleanup'],initialDrawCalls:snap.render.calls,errors},null,2));console.log('Browser smoke checks passed; draw calls:',snap.render.calls);
 }finally{await browser.close();}
+
+async function livingChecks(page){
+ await page.locator('[data-speed="0"]').click();
+ for(const [type,phase]of [['fridge','cook'],['fridge','eat'],['fridge','loadDishwasher'],['bed','sleep'],['pool','swim'],['tv','watchTV']]){
+  const result=await page.evaluate(async({type,phase})=>{const game=await import('/game.js'),sim=await import('/sim.js');const s=game.state,p=s.people[0];sim.cancelAction(p);const ok=sim.order(s,p,{kind:'object',id:s.objects.find(o=>o.type===type).id});for(let i=0;i<2400&&p.task?.phase!==phase;i++)sim.tick(s,.25,false);game.effects.update(s,5);return {ok,phase:p.task?.phase,food:game.effects.meals.get(p.id)?.root.visible,door:game.effects.doors.find(d=>d.o.type==='dishwasher')?.door.rotation.x};},{type,phase});
+  assert.ok(result.ok);assert.equal(result.phase,phase);if(['cook','eat','loadDishwasher'].includes(phase))assert.ok(result.food);
+  await page.waitForTimeout(100);await page.screenshot({path:'test-results/routine-'+phase+'.png'});
+ }
+ const empty=await page.evaluate(async()=>{const g=await import('/game.js'),sim=await import('/sim.js'),s=g.state,p=s.people[0];sim.cancelAction(p);sim.order(s,p,{kind:'object',id:s.objects.find(o=>o.type==='fridge').id});for(let i=0;i<2400&&p.task?.phase!=='eat';i++)sim.tick(s,.25,false);p.task.progress=.99;g.effects.update(s,3);return g.effects.meals.get(p.id).root.userData.food.visible;});assert.equal(empty,false);
+ await page.locator('#child').click();assert.match(await page.locator('#identity').textContent(),/Toddler.*Generation 2/);
+ await page.locator('#aging').uncheck();assert.equal((await page.evaluate(()=>window.gameDebug.snapshot())).state.aging,false);
+ await page.locator('[data-speed="1"]').click();
+}
