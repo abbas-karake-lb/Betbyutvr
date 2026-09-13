@@ -22,5 +22,29 @@ try{
  await page.locator('#music').click();assert.match(await page.locator('#music').textContent(),/on/);await page.locator('#music').click();
  await page.locator('#vr').click();await page.waitForFunction(()=>/VR is unavailable|Could not enter VR/.test(document.getElementById('notice').textContent));assert.match(await page.locator('#notice').textContent(),/VR is unavailable|Could not enter VR/);
  await page.setViewportSize({width:390,height:844});await page.waitForFunction(()=>innerWidth===390&&document.querySelector('#game canvas').clientWidth===390);assert.ok(await page.locator('#vr').isVisible());assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),390);await page.screenshot({path:'test-results/mobile.png'});
- assert.deepEqual(errors,[]);await fs.writeFile('test-results/report.json',JSON.stringify({passed:true,checks:['WebGL initialization','draw call budget','floor placement and cost','undo','furniture purchase','furniture interaction raycast','family creation','save and reload','view toggle','wall mode','audio toggle','non-XR fallback','mobile viewport'],initialDrawCalls:snap.render.calls,errors},null,2));console.log('Browser smoke checks passed; draw calls:',snap.render.calls);
+ // Exercise the real panel and controller handlers with synthetic tracked poses.
+ await page.setViewportSize({width:1440,height:1000});await page.locator('#view').click();
+ const vrCheck=await page.evaluate(async()=>{
+  const game=await import('/game.js'),T=await import('/vendor/three.module.js');
+  const [right,left]=game.controllers;game.panel.visible=true;game.placePanel();
+  for(const [i,c]of game.controllers.entries()){c.matrixAutoUpdate=true;c.visible=true;c.userData.source={handedness:i?'left':'right'};}
+  // Put the controller origins in front of the menu, slightly below eye height.
+  const panelCenter=game.panel.getWorldPosition(new T.Vector3());
+  const facing=new T.Vector3(0,0,1).applyQuaternion(game.panel.quaternion);
+  const side=new T.Vector3(1,0,0).applyQuaternion(game.panel.quaternion);
+  function aim(c,x,y){const local=new T.Vector3((x/900-.5)*.9,(.5-y/1100)*1.1,0);const target=game.panel.localToWorld(local);c.quaternion.setFromRotationMatrix(new T.Matrix4().lookAt(c.position,target,new T.Vector3(0,1,0)));}
+  right.position.copy(panelCenter).addScaledVector(facing,.8).addScaledVector(side,.18);right.position.y-=.25;
+  left.position.copy(panelCenter).addScaledVector(facing,.8).addScaledVector(side,-.18);left.position.y-=.25;
+  aim(right,650,350);aim(left,200,350);game.updateControllerPointers();
+  const pixel=(x,y)=>Array.from(game.panelCanvas.getContext('2d').getImageData(x,y,1,1).data).slice(0,3);
+  const hovered=pixel(480,335),activeHovered=pixel(55,335);
+  const cursors=game.controllers.map(c=>c.userData.pointer.cursor.visible);
+  document.body.classList.add('xr');window.vrPointerFixture={game,right,left,aim,pixel};
+  return{hovered,activeHovered,cursors};
+ });
+ assert.deepEqual(vrCheck.hovered,[57,127,121]);assert.deepEqual(vrCheck.activeHovered,[255,225,160]);assert.deepEqual(vrCheck.cursors,[true,true]);
+ await page.screenshot({path:'test-results/vr-pointer-hover.png'});
+ const selection=await page.evaluate(()=>{const f=window.vrPointerFixture;f.right.dispatchEvent({type:'selectstart'});return window.gameDebug.snapshot().mode;});assert.equal(selection,'build');
+ const cleared=await page.evaluate(()=>{const f=window.vrPointerFixture;for(const c of f.game.controllers)c.dispatchEvent({type:'disconnected'});f.game.updateControllerPointers();const result={cursors:f.game.controllers.map(c=>c.userData.pointer.cursor.visible),color:f.pixel(55,335)};f.game.panel.visible=false;document.body.classList.remove('xr');return result;});assert.deepEqual(cleared.cursors,[false,false]);assert.deepEqual(cleared.color,[49,89,97]);
+ assert.deepEqual(errors,[]);await fs.writeFile('test-results/report.json',JSON.stringify({passed:true,checks:['WebGL initialization','draw call budget','floor placement and cost','undo','furniture purchase','furniture interaction raycast','family creation','save and reload','view toggle','wall mode','audio toggle','non-XR fallback','mobile viewport','VR cursor visibility','two-controller button hover','VR trigger matches hover','VR disconnect cleanup'],initialDrawCalls:snap.render.calls,errors},null,2));console.log('Browser smoke checks passed; draw calls:',snap.render.calls);
 }finally{await browser.close();}

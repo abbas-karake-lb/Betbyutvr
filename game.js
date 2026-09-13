@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {panelTarget,createControllerPointer} from './vr-pointer.js';
 import {mergeGeometries} from './vendor/BufferGeometryUtils.js';
 import {CATALOG,NEEDS,item,key,edge,inside,blocked,path,person,household,order,tick,validSave} from './sim.js';
 const $=id=>document.getElementById(id);let lot=0,state,selected,mode='live',category='Build',tool='floor',rotation=0,wallMode=1,speed=1,autonomy=true,walk=false,undo=[],dirty=true,uiTime=0,vrPage='Main',vrOffset=0,teleport=false;
@@ -116,8 +117,8 @@ function toggleMusic(){audioCtx??=new(window.AudioContext||window.webkitAudioCon
 function musicTick(){if(!music||!audioCtx||audioCtx.state!=='running')return;if(nextNote<audioCtx.currentTime-.3)nextNote=audioCtx.currentTime;while(nextNote<audioCtx.currentTime+.15){const melody=melodies[mode==='build'?1:0],midi=melody[noteIndex%melody.length],o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='triangle';o.frequency.value=440*2**((midi-69)/12);g.gain.setValueAtTime(0,nextNote);g.gain.linearRampToValueAtTime(.035,nextNote+.012);g.gain.exponentialRampToValueAtTime(.0001,nextNote+.8);o.connect(g).connect(audioCtx.destination);o.start(nextNote);o.stop(nextNote+.85);noteIndex++;nextNote+=mode==='build'?.36:.5;}}
 $('music').onclick=toggleMusic;
 // The VR menu is a raycastable mesh: it works without DOM overlays in immersive mode.
-const panelCanvas=document.createElement('canvas');panelCanvas.width=900;panelCanvas.height=1100;const ctx=panelCanvas.getContext('2d'),panelTexture=new T.CanvasTexture(panelCanvas);panelTexture.colorSpace=T.SRGBColorSpace;const panel=new T.Mesh(new T.PlaneGeometry(.9,1.1),new T.MeshBasicMaterial({map:panelTexture,side:T.DoubleSide,depthTest:false}));panel.renderOrder=100;panel.visible=false;scene.add(panel);let panelButtons=[];
-function buttonRect(text,x,y,w,action,active=false){ctx.fillStyle=active?'#ddb76e':'#315961';ctx.beginPath();ctx.roundRect(x,y,w,70,12);ctx.fill();ctx.fillStyle=active?'#193b42':'#eff4e9';ctx.font='24px sans-serif';ctx.fillText(text.slice(0,31),x+16,y+44);panelButtons.push({x,y,w,h:70,action});}
+const panelCanvas=document.createElement('canvas');panelCanvas.width=900;panelCanvas.height=1100;const ctx=panelCanvas.getContext('2d'),panelTexture=new T.CanvasTexture(panelCanvas);panelTexture.colorSpace=T.SRGBColorSpace;const panel=new T.Mesh(new T.PlaneGeometry(.9,1.1),new T.MeshBasicMaterial({map:panelTexture,side:T.DoubleSide,depthTest:false}));panel.renderOrder=100;panel.visible=false;scene.add(panel);let panelButtons=[];let hoveredPanelButtons=new Set();
+function buttonRect(text,x,y,w,action,active=false){const hovered=hoveredPanelButtons.has(panelButtons.length);ctx.fillStyle=hovered?(active?'#ffe1a0':'#397f79'):(active?'#ddb76e':'#315961');ctx.beginPath();ctx.roundRect(x,y,w,70,12);ctx.fill();if(hovered){ctx.strokeStyle='#96ffe5';ctx.lineWidth=4;ctx.stroke();}ctx.fillStyle=active?'#193b42':'#eff4e9';ctx.font='24px sans-serif';ctx.fillText(text.slice(0,31),x+16,y+44);panelButtons.push({x,y,w,h:70,action});}
 function drawPanel(){panelButtons=[];ctx.fillStyle='#183a42';ctx.fillRect(0,0,900,1100);ctx.fillStyle='#e5bf78';ctx.font='bold 34px sans-serif';ctx.fillText('LITTLE LIVES',35,55);ctx.fillStyle='#b7ccc5';ctx.font='22px sans-serif';ctx.fillText(`Day ${state.day}   $${Math.floor(state.money)}   ${mode==='build'?'Building · paused':speed+'× speed'}`,35,95);const p=psel();ctx.fillStyle='#f2f0dd';ctx.font='bold 27px sans-serif';ctx.fillText(p.name+' · '+p.activity,35,144);
  NEEDS.forEach((n,i)=>{const x=35+(i%3)*285,y=178+Math.floor(i/3)*63;ctx.fillStyle='#c7d6ce';ctx.font='19px sans-serif';ctx.fillText(n,x,y);ctx.fillStyle='#31545a';ctx.fillRect(x,y+9,240,9);ctx.fillStyle=p.needs[n]<25?'#d48669':'#99bb8b';ctx.fillRect(x,y+9,p.needs[n]*2.4,9);});
  let rows=[];if(vrPage==='Main'){rows=[['Live',()=>setMode('live'),mode==='live'],['Build & buy',()=>{setMode('build');vrPage='Categories';drawPanel();},mode==='build'],[walk?'Tabletop view':'Walk inside',setView],['Walls: '+['hidden','cutaway','full'][wallMode],setWalls],['Household',()=>{vrPage='People';drawPanel();}],['Neighborhood',()=>{vrPage='Lots';drawPanel();}],['Pause / play',()=>setSpeed(speed?0:1)],['Speed: '+speed+'×',()=>setSpeed(speed===1?3:speed===3?8:1)],['Save household',()=>save()],['Music: '+(music?'on':'off'),toggleMusic],['Teleport: '+(teleport?'on':'off'),()=>{if(!walk)setView();teleport=!teleport;setMode('live');drawPanel();},teleport],['Exit VR',()=>renderer.xr.getSession()?.end()]];}
@@ -130,19 +131,43 @@ function drawPanel(){panelButtons=[];ctx.fillStyle='#183a42';ctx.fillRect(0,0,90
 }
 function placePanel(){const cam=renderer.xr.isPresenting?renderer.xr.getCamera():camera,pos=new T.Vector3(),dir=new T.Vector3();cam.getWorldPosition(pos);cam.getWorldDirection(dir);dir.y=0;if(dir.lengthSq()<.001)dir.set(0,0,-1);dir.normalize();panel.position.copy(pos).addScaledVector(dir,1.4);panel.position.y=Math.max(.8,pos.y-.1);panel.lookAt(pos.x,panel.position.y,pos.z);}
 function applyXRView(){if(renderer.xr.isPresenting){if(walk){world.scale.setScalar(1);world.position.set(0,0,0);const p=psel();rig.position.set(p.x,0,p.z);}else{world.scale.setScalar(.09);world.position.set(0,.65,-1.9);rig.position.set(0,0,0);}rig.rotation.set(0,0,0);placePanel();}else{world.scale.setScalar(1);world.position.set(0,0,0);}}
-const controllers=[];for(let i=0;i<2;i++){const c=renderer.xr.getController(i);rig.add(c);const line=new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(),new T.Vector3(0,0,-1)]),new T.LineBasicMaterial({color:'#efc773'}));line.scale.z=5;c.add(line);c.userData.line=line;c.addEventListener('connected',e=>c.userData.source=e.data);c.addEventListener('disconnected',()=>c.userData.source=null);c.addEventListener('selectstart',()=>{controllerRay(c);const ph=raycaster.intersectObject(panel)[0];if(ph&&panel.visible){const x=ph.uv.x*900,y=(1-ph.uv.y)*1100;const b=panelButtons.find(b=>x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h);if(b){b.action();drawPanel();}return;}handleHit(worldHit());});c.addEventListener('squeezestart',placePanel);controllers.push(c);}
-function controllerRay(c){const rotationMatrix=new T.Matrix4().extractRotation(c.matrixWorld);raycaster.ray.origin.setFromMatrixPosition(c.matrixWorld);raycaster.ray.direction.set(0,0,-1).applyMatrix4(rotationMatrix);}
+const controllers=[];
+for(let i=0;i<2;i++){
+ const c=renderer.xr.getController(i);rig.add(c);c.userData.pointer=createControllerPointer(c,scene);
+ c.addEventListener('connected',e=>c.userData.source=e.data);
+ c.addEventListener('disconnected',()=>{c.userData.source=null;c.userData.pointer.hide();updateControllerPointers();});
+ c.addEventListener('selectstart',()=>{
+  if(!c.userData.source||!c.visible)return;
+  const target=panelTarget(raycaster,c,panel,panelButtons,panelCanvas.width,panelCanvas.height);
+  c.userData.pointer.update(target.hit,target.hit?panel:null,target.buttonIndex>=0);
+  if(target.hit){if(target.button){target.button.action();updateControllerPointers();}return;}
+  handleHit(worldHit());
+ });
+ c.addEventListener('squeezestart',placePanel);controllers.push(c);
+}
+function updateControllerPointers(){
+ const nextHovered=new Set();world.updateWorldMatrix(true,true);
+ for(const c of controllers){
+  if(!c.userData.source||!c.visible){c.userData.pointer.hide();continue;}
+  const target=panelTarget(raycaster,c,panel,panelButtons,panelCanvas.width,panelCanvas.height);
+  const hit=target.hit||worldHit();
+  c.userData.pointer.update(hit,target.hit?panel:null,target.buttonIndex>=0);
+  if(target.buttonIndex>=0)nextHovered.add(target.buttonIndex);
+  if(!target.hit&&hit&&mode==='build'){const p=world.worldToLocal(hit.point.clone());hover.position.set(Math.round(p.x),.04,Math.round(p.z));}
+ }
+ if(nextHovered.size!==hoveredPanelButtons.size||[...nextHovered].some(i=>!hoveredPanelButtons.has(i))){hoveredPanelButtons=nextHovered;drawPanel();}
+}
 function deadzone(v){return Math.abs(v)<.18?0:Math.sign(v)*(Math.abs(v)-.18)/.82;}
 function moveWalk(dx,dz,isVR){const base=isVR?rig.position:target;let nx=T.MathUtils.clamp(base.x+dx,-11.4,11.4),nz=T.MathUtils.clamp(base.z+dz,-11.4,11.4);const old={x:Math.round(base.x),z:Math.round(base.z)};
  const can=(x,z)=>{const ex=Math.round(x),ez=Math.round(z);if(blocked(state,ex,ez))return false;if(ex===old.x&&ez===old.z)return true;const route=path(state,old,{x:ex,z:ez});return route&&route.length<=1;};
  if(can(nx,base.z))base.x=nx;if(can(base.x,nz))base.z=nz;}
-function xrInput(dt){for(const c of controllers){const src=c.userData.source;if(!src)continue;controllerRay(c);const ph=raycaster.intersectObject(panel)[0],wh=worldHit(),h=ph||wh;c.userData.line.scale.z=h?h.distance:5;if(!ph&&wh&&mode==='build'){const p=world.worldToLocal(wh.point.clone());hover.position.set(Math.round(p.x),.04,Math.round(p.z));}
+function xrInput(dt){for(const c of controllers){const src=c.userData.source;if(!src||!c.visible)continue;
  const gp=src.gamepad;if(!gp)continue;const ax=gp.axes,ix=ax.length>=4?2:0,iz=ax.length>=4?3:1,x=deadzone(ax[ix]||0),z=deadzone(ax[iz]||0);
  if(src.handedness==='left'){const forward=new T.Vector3();renderer.xr.getCamera().getWorldDirection(forward);forward.y=0;forward.normalize();const right=new T.Vector3(-forward.z,0,forward.x),delta=forward.multiplyScalar(-z*dt*(walk?1.6:.6)).addScaledVector(right,x*dt*(walk?1.6:.6));if(walk)moveWalk(delta.x,delta.z,true);else rig.position.add(delta);}
  if(src.handedness==='right'){if(x){const eye=new T.Vector3();renderer.xr.getCamera().getWorldPosition(eye);const offset=rig.position.clone().sub(eye);offset.applyAxisAngle(new T.Vector3(0,1,0),-x*dt*1.2);rig.rotation.y-=x*dt*1.2;rig.position.copy(eye).add(offset);rig.position.y=0;}if(!walk&&z){world.scale.setScalar(T.MathUtils.clamp(world.scale.x-z*dt*.055,.045,.25));}}
- }}
+ }updateControllerPointers();}
 $('vr').onclick=async()=>{try{if(renderer.xr.isPresenting){await renderer.xr.getSession().end();return;}if(!navigator.xr||!await navigator.xr.isSessionSupported('immersive-vr')){notice('VR is unavailable here. Open this HTTPS page in the Quest browser.');return;}const session=await navigator.xr.requestSession('immersive-vr',{optionalFeatures:['local-floor','bounded-floor']});await renderer.xr.setSession(session);}catch(e){notice('Could not enter VR: '+e.message);}};
-renderer.xr.addEventListener('sessionstart',()=>{document.body.classList.add('xr');camera.position.set(0,0,0);camera.rotation.set(0,0,0);applyXRView();panel.visible=true;vrPage='Main';drawPanel();setTimeout(placePanel,250);});renderer.xr.addEventListener('sessionend',()=>{document.body.classList.remove('xr');panel.visible=false;rig.position.set(0,0,0);rig.rotation.set(0,0,0);applyXRView();updateCamera();});
+renderer.xr.addEventListener('sessionstart',()=>{document.body.classList.add('xr');camera.position.set(0,0,0);camera.rotation.set(0,0,0);applyXRView();panel.visible=true;vrPage='Main';drawPanel();setTimeout(placePanel,250);});renderer.xr.addEventListener('sessionend',()=>{document.body.classList.remove('xr');panel.visible=false;hoveredPanelButtons.clear();for(const c of controllers)c.userData.pointer.hide();rig.position.set(0,0,0);rig.rotation.set(0,0,0);applyXRView();updateCamera();});
 let prevTime=0;renderer.setAnimationLoop(time=>{const dt=Math.min((time-prevTime)/1000,.05);prevTime=time;if(mode==='live')tick(state,dt*4*speed,autonomy);if(dirty)rebuild();
  for(const p of state.people){const g=personMeshes.get(p.id);if(!g)continue;g.visible=!p.job&&!(walk&&Math.hypot(p.x-(renderer.xr.isPresenting?rig.position.x:target.x),p.z-(renderer.xr.isPresenting?rig.position.z:target.z))<.4);g.position.set(p.x,0,p.z);if(p.path.length){const[tx,tz]=p.path[0];g.rotation.y=Math.atan2(tx-p.x,tz-p.z);g.userData.legs.forEach((l,i)=>l.rotation.x=Math.sin(time*.009+i*Math.PI)*.42);}else g.userData.legs.forEach(l=>l.rotation.x=0);}
  const p=psel();marker.visible=!p.job;marker.position.set(p.x,Math.sin(time*.003)*.05,p.z);hover.visible=mode==='build';if(renderer.xr.isPresenting)xrInput(dt);else if(walk){let x=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0),z=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0);if(x||z){const len=Math.hypot(x,z);x=x/len*dt*2;z=z/len*dt*2;moveWalk(x*Math.cos(yaw)+z*Math.sin(yaw),z*Math.cos(yaw)-x*Math.sin(yaw),false);updateCamera();}}
@@ -151,3 +176,6 @@ addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updat
 rebuild();catalogUI();renderUI();updateCamera();
 // Read-only diagnostic snapshot used by the browser smoke test.
 window.gameDebug={snapshot:()=>JSON.parse(JSON.stringify({state,mode,walk,wallMode,tool,selected,render:renderer.info.render})),project:(x,y,z)=>{const p=new T.Vector3(x,y,z).applyMatrix4(world.matrixWorld).project(camera);return{x:(p.x+1)*innerWidth/2,y:(1-p.y)*innerHeight/2};}};
+
+// Export interaction components for headless integration tests without a headset.
+export {controllers,panel,panelCanvas,placePanel,updateControllerPointers};

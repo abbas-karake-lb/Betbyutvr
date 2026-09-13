@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify simulation
-        run: node --test tests/sim.test.js
+        run: node --test tests/*.test.js
       - name: Install browser test dependencies
         run: |
           npm install --no-save --package-lock=false playwright@1.51.1
@@ -40,7 +40,7 @@ jobs:
       - name: Package static game
         run: |
           mkdir _site
-          cp index.html style.css game.js sim.js _site/
+          cp index.html style.css game.js sim.js vr-pointer.js _site/
           cp -r vendor _site/vendor
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
